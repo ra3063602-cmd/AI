@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import NotFound from '@/pages/not-found';
 import {
   ArrowUpRight,
@@ -32,22 +33,23 @@ function Home() {
   const [draft, setDraft] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isListening, setIsListening] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const endOfConversationRef = useRef<HTMLDivElement>(null);
-  const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { isListening, toggleListening, stopListening } =
+    useSpeechRecognition({
+      onTranscript: (transcript) => {
+        setDraft(transcript);
+        setErrorMessage(null);
+      },
+      onError: (message) => {
+        setErrorMessage(message);
+      },
+    });
 
   useEffect(() => {
     endOfConversationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [messages, isTyping]);
-
-  useEffect(() => {
-    return () => {
-      if (listeningTimeoutRef.current) {
-        clearTimeout(listeningTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const sendMessage = async (value: string) => {
     const cleanValue = value.trim();
@@ -139,25 +141,8 @@ function Home() {
     sendMessage(draft);
   };
 
-  const toggleListening = () => {
-    if (listeningTimeoutRef.current) {
-      clearTimeout(listeningTimeoutRef.current);
-      listeningTimeoutRef.current = null;
-    }
-
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    setIsListening(true);
-    listeningTimeoutRef.current = setTimeout(() => {
-      setIsListening(false);
-      setDraft('I’m ready to talk through it.');
-    }, 2600);
-  };
-
   const startNewConversation = () => {
+    stopListening();
     setMessages([]);
     setDraft('');
     setIsTyping(false);
