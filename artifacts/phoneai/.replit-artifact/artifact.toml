@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "PhoneAI"
+description = "A mobile-first dark chat interface for Android users to interact with an AI assistant. Includes a responsive conversation view, message composer, send action, and microphone control, ready for a future AI connection."
+version = "1.0.0"
+id = "artifacts/phoneai"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21483
+
+[services.development]
+run = "pnpm --filter @workspace/phoneai run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/phoneai", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/phoneai/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21483"
+BASE_PATH = "/"
