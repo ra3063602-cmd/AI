@@ -42,7 +42,12 @@ export const SendChatMessageResponse = zod.object({
   "message": zod.object({
   "role": zod.enum(['user', 'assistant']),
   "content": zod.string().min(1).max(sendChatMessageResponseMessageContentMax)
-})
+}),
+  "command": zod.union([zod.object({
+  "type": zod.enum(['open_url']),
+  "url": zod.string().url(),
+  "label": zod.string()
+}),zod.null()])
 })
 
 

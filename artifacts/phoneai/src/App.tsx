@@ -82,7 +82,11 @@ function Home() {
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { message?: { content?: string }; error?: string }
+        | {
+            message?: { content?: string };
+            command?: { type?: string; url?: string };
+            error?: string;
+          }
         | null;
 
       if (!response.ok) {
@@ -105,6 +109,20 @@ function Home() {
           time: 'now',
         },
       ]);
+
+      if (
+        payload?.command?.type === 'open_url' &&
+        payload.command.url
+      ) {
+        const openedWindow = window.open(
+          payload.command.url,
+          '_blank',
+          'noopener,noreferrer',
+        );
+        if (!openedWindow) {
+          window.location.assign(payload.command.url);
+        }
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error

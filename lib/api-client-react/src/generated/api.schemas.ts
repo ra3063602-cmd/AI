@@ -34,7 +34,21 @@ export interface ChatRequest {
   messages: ChatMessage[];
 }
 
+export type ChatCommandType = typeof ChatCommandType[keyof typeof ChatCommandType];
+
+
+export const ChatCommandType = {
+  open_url: 'open_url',
+} as const;
+
+export interface ChatCommand {
+  type: ChatCommandType;
+  url: string;
+  label: string;
+}
+
 export interface ChatResponse {
   message: ChatMessage;
+  command: ChatCommand | null;
 }
 

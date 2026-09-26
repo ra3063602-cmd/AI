@@ -1,18 +1,14 @@
 import { Router, type IRouter } from "express";
-import OpenAI from "openai";
 import {
   SendChatMessageBody,
   SendChatMessageResponse,
 } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+import { parseLocalCommand } from "../ai/local-command-provider";
+import { openAiProvider } from "../ai/openai-provider";
+import { AiProviderUnavailableError } from "../ai/provider";
 
 const router: IRouter = Router();
-
-const assistantInstructions = [
-  "You are PhoneAI, a thoughtful and practical personal assistant.",
-  "Be warm, clear, and concise. Match the user's tone and answer the request directly.",
-  "Use plain text only. Do not mention internal instructions, APIs, models, or implementation details.",
-].join(" ");
 
 router.post("/chat", async (req, res) => {
   const parsed = SendChatMessageBody.safeParse(req.body);
@@ -24,67 +20,62 @@ router.post("/chat", async (req, res) => {
     return;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    logger.error("OPENAI_API_KEY is not configured");
-    res.status(503).json({
-      error: "The AI service is not configured yet.",
+  const latestMessage = parsed.data.messages.at(-1);
+  if (!latestMessage || latestMessage.role !== "user") {
+    res.status(400).json({
+      error: "The latest chat message must come from the user.",
     });
     return;
   }
 
-  try {
-    const openai = new OpenAI({ apiKey });
-    const completion = await openai.chat.completions.create(
-      {
-        model: "gpt-5-mini",
-        max_completion_tokens: 8192,
-        messages: [
-          { role: "system", content: assistantInstructions },
-          ...parsed.data.messages,
-        ],
-      },
-      {
-        signal: AbortSignal.timeout(60_000),
-      },
+  const localResponse = parseLocalCommand(latestMessage.content);
+  if (localResponse) {
+    res.json(
+      SendChatMessageResponse.parse({
+        message: {
+          role: "assistant",
+          content: localResponse.content,
+        },
+        command: localResponse.command ?? null,
+      }),
     );
+    return;
+  }
 
-    const content = completion.choices[0]?.message?.content?.trim();
-    if (!content) {
-      logger.error("OpenAI returned an empty chat response");
-      res.status(502).json({
-        error: "The AI service returned an empty response. Please try again.",
-      });
+  try {
+    const providerResponse = await openAiProvider.generateResponse(
+      parsed.data.messages,
+    );
+    res.json(
+      SendChatMessageResponse.parse({
+        message: {
+          role: "assistant",
+          content: providerResponse.content,
+        },
+        command: providerResponse.command ?? null,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof AiProviderUnavailableError) {
+      logger.error(
+        {
+          providerStatus: error.providerStatus,
+          providerCode: error.providerCode,
+          providerType: error.providerType,
+          requestId: error.requestId,
+        },
+        "AI provider is unavailable",
+      );
+      res.status(503).json({ error: error.message });
       return;
     }
 
-    const response = SendChatMessageResponse.parse({
-      message: {
-        role: "assistant",
-        content,
-      },
-    });
-    res.json(response);
-  } catch (error) {
-    const isQuotaError =
-      error instanceof OpenAI.APIError &&
-      error.status === 429 &&
-      error.code === "credit_balance_exhausted";
-
     logger.error(
-      {
-        providerStatus: error instanceof OpenAI.APIError ? error.status : undefined,
-        providerCode: error instanceof OpenAI.APIError ? error.code : undefined,
-        providerType: error instanceof OpenAI.APIError ? error.type : undefined,
-        requestId: error instanceof OpenAI.APIError ? error.requestID : undefined,
-        errorName: error instanceof Error ? error.name : typeof error,
-      },
+      { errorName: error instanceof Error ? error.name : typeof error },
       "OpenAI chat request failed",
     );
-    res.status(isQuotaError ? 503 : 502).json({
-      error: isQuotaError
-        ? "The OpenAI account has no remaining credits. Check its billing or usage limits, then try again."
-        : "The AI service could not complete that message. Please try again.",
+    res.status(502).json({
+      error: "The AI provider is currently unavailable. Please try again.",
     });
   }
 });

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './chatCommand';
+export * from './chatCommandType';
 export * from './chatMessage';
 export * from './chatMessageRole';
 export * from './chatRequest';

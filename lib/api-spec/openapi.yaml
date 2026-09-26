@@ -89,6 +89,26 @@ components:
       properties:
         message:
           $ref: "#/components/schemas/ChatMessage"
+        command:
+          oneOf:
+            - $ref: "#/components/schemas/ChatCommand"
+            - type: "null"
       required:
         - message
+        - command
+    ChatCommand:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [open_url]
+        url:
+          type: string
+          format: uri
+        label:
+          type: string
+      required:
+        - type
+        - url
+        - label
 
