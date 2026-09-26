@@ -10,6 +10,7 @@ import {
   Bot,
   Check,
   CircleStop,
+  CircleAlert,
   Mic,
   PanelLeft,
   Plus,
@@ -27,16 +28,10 @@ import {
 const queryClient = new QueryClient();
 
 function Home() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text: 'Good morning. I’m here and ready when you are. What would make today feel a little easier?',
-      time: 'now',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const endOfConversationRef = useRef<HTMLDivElement>(null);
@@ -54,30 +49,71 @@ function Home() {
     };
   }, []);
 
-  const sendMessage = (value: string) => {
+  const sendMessage = async (value: string) => {
     const cleanValue = value.trim();
     if (!cleanValue || isTyping) return;
 
     const messageId = `user-${Date.now()}`;
-    setMessages((current) => [
-      ...current,
-      { id: messageId, role: 'user', text: cleanValue, time: 'now' },
-    ]);
+    const userMessage: Message = {
+      id: messageId,
+      role: 'user',
+      text: cleanValue,
+      time: 'now',
+    };
+    const nextMessages = [...messages, userMessage];
+
+    setMessages(nextMessages);
     setDraft('');
     setIsTyping(true);
+    setErrorMessage(null);
 
-    window.setTimeout(() => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: nextMessages.map(({ role, text }) => ({
+            role,
+            content: text,
+          })),
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: { content?: string }; error?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.error ?? 'The AI service could not complete that message.',
+        );
+      }
+
+      const assistantText = payload?.message?.content?.trim();
+      if (!assistantText) {
+        throw new Error('The AI service returned an empty response.');
+      }
+
       setMessages((current) => [
         ...current,
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          text: getDemoResponse(cleanValue),
+          text: assistantText,
           time: 'now',
         },
       ]);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong while contacting the AI service.',
+      );
+    } finally {
       setIsTyping(false);
-    }, 720);
+    }
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -104,16 +140,10 @@ function Home() {
   };
 
   const startNewConversation = () => {
-    setMessages([
-      {
-        id: `welcome-${Date.now()}`,
-        role: 'assistant',
-        text: 'A fresh page. Take your time — what’s on your mind?',
-        time: 'now',
-      },
-    ]);
+    setMessages([]);
     setDraft('');
     setIsTyping(false);
+    setErrorMessage(null);
     setIsPanelOpen(false);
   };
 
@@ -160,11 +190,11 @@ function Home() {
                 Ready when you are
               </div>
               <p className="mt-2 text-[11px] leading-5 text-sidebar-foreground/55">
-                This demo stays in your browser. Nothing leaves this page.
+                Your messages are sent securely to the AI service for a response.
               </p>
             </div>
             <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/35">
-              Local demo · v0.1
+              AI chat · v0.2
             </p>
           </div>
         </aside>
@@ -240,7 +270,18 @@ function Home() {
                   <div ref={endOfConversationRef} />
                 </div>
 
-                {messages.length === 1 && !isTyping && (
+                {errorMessage && (
+                  <div
+                    className="mt-6 flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                    role="alert"
+                    data-testid="status-error"
+                  >
+                    <CircleAlert size={18} className="mt-0.5 shrink-0" />
+                    <p>{errorMessage}</p>
+                  </div>
+                )}
+
+                {messages.length === 0 && !isTyping && !errorMessage && (
                   <div className="mt-10 grid gap-2 sm:grid-cols-2" data-testid="list-starter-prompts">
                     {starterPrompts.map((prompt) => (
                       <button
@@ -295,7 +336,7 @@ function Home() {
                   </button>
                 </div>
                 <p className="mt-3 text-center text-[10px] tracking-[0.03em] text-muted-foreground/65">
-                  PhoneAI is a local demo · responses are thoughtfully pre-written
+                  PhoneAI sends messages securely to the AI service
                 </p>
               </form>
             </div>
@@ -319,20 +360,6 @@ const starterPrompts = [
   { label: 'Make a small decision', text: 'Help me make a small decision.' },
   { label: 'Give me a reset', text: 'I need a gentle reset.' },
 ];
-
-function getDemoResponse(message: string) {
-  const normalizedMessage = message.toLowerCase();
-  if (normalizedMessage.includes('morning') || normalizedMessage.includes('plan')) {
-    return 'Let’s keep it light: choose one thing that needs your best attention, one small practical task, and a little space between them. That’s enough of a morning plan.';
-  }
-  if (normalizedMessage.includes('decision') || normalizedMessage.includes('choose')) {
-    return 'Try asking: “Which option gives me more room to be myself today?” If both feel close, choose the one you can undo most easily.';
-  }
-  if (normalizedMessage.includes('reset') || normalizedMessage.includes('stressed')) {
-    return 'Pause with me for a moment. Put both feet down, soften your shoulders, and name the next five-minute action — not the whole day.';
-  }
-  return 'I hear you. This is a local demo, so my reply is simple for now — but the space is yours. You can keep going, start somewhere smaller, or just leave the thought here.';
-}
 
 function AssistantMark() {
   return (
