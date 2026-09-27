@@ -5,10 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ChatCommand } from './chatCommand';
+import type { ChatAction } from './chatAction';
 import type { ChatMessage } from './chatMessage';
 
 export interface ChatResponse {
   message: ChatMessage;
-  command: ChatCommand | null;
+  action: ChatAction | null;
 }

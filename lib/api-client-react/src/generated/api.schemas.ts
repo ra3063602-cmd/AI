@@ -34,21 +34,46 @@ export interface ChatRequest {
   messages: ChatMessage[];
 }
 
-export type ChatCommandType = typeof ChatCommandType[keyof typeof ChatCommandType];
+export type ChatActionType = typeof ChatActionType[keyof typeof ChatActionType];
 
 
-export const ChatCommandType = {
-  open_url: 'open_url',
+export const ChatActionType = {
+  OPEN_URL: 'OPEN_URL',
+  SEARCH_WEB: 'SEARCH_WEB',
+  OPEN_GALLERY: 'OPEN_GALLERY',
+  SHOW_DATE: 'SHOW_DATE',
+  SHOW_TIME: 'SHOW_TIME',
 } as const;
 
-export interface ChatCommand {
-  type: ChatCommandType;
-  url: string;
-  label: string;
+export type ChatActionParametersSource = typeof ChatActionParametersSource[keyof typeof ChatActionParametersSource];
+
+
+export const ChatActionParametersSource = {
+  device_gallery: 'device_gallery',
+} as const;
+
+export type ChatActionParametersLocale = typeof ChatActionParametersLocale[keyof typeof ChatActionParametersLocale];
+
+
+export const ChatActionParametersLocale = {
+  default: 'default',
+} as const;
+
+export type ChatActionParameters = {
+  url?: string;
+  /** @maxLength 500 */
+  query?: string;
+  source?: ChatActionParametersSource;
+  locale?: ChatActionParametersLocale;
+};
+
+export interface ChatAction {
+  type: ChatActionType;
+  parameters: ChatActionParameters;
 }
 
 export interface ChatResponse {
   message: ChatMessage;
-  command: ChatCommand | null;
+  action: ChatAction | null;
 }
 

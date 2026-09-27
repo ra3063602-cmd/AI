@@ -36,6 +36,8 @@ export const SendChatMessageBody = zod.object({
 
 export const sendChatMessageResponseMessageContentMax = 12000;
 
+export const sendChatMessageResponseActionOneParametersQueryMax = 500;
+
 
 
 export const SendChatMessageResponse = zod.object({
@@ -43,10 +45,14 @@ export const SendChatMessageResponse = zod.object({
   "role": zod.enum(['user', 'assistant']),
   "content": zod.string().min(1).max(sendChatMessageResponseMessageContentMax)
 }),
-  "command": zod.union([zod.object({
-  "type": zod.enum(['open_url']),
-  "url": zod.string().url(),
-  "label": zod.string()
+  "action": zod.union([zod.object({
+  "type": zod.enum(['OPEN_URL', 'SEARCH_WEB', 'OPEN_GALLERY', 'SHOW_DATE', 'SHOW_TIME']),
+  "parameters": zod.object({
+  "url": zod.string().url().optional(),
+  "query": zod.string().max(sendChatMessageResponseActionOneParametersQueryMax).optional(),
+  "source": zod.enum(['device_gallery']).optional(),
+  "locale": zod.enum(['default']).optional()
+})
 }),zod.null()])
 })
 

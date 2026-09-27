@@ -1,4 +1,5 @@
 import type { ProviderResponse } from "./provider";
+import type { PhoneAction } from "@workspace/phoneai-actions";
 
 const cleanCommand = (input: string) =>
   input
@@ -12,40 +13,46 @@ export function parseLocalCommand(input: string): ProviderResponse | null {
   const command = cleanCommand(input);
 
   if (command === "open youtube") {
+    const action: PhoneAction = {
+      type: "OPEN_URL",
+      parameters: { url: "https://www.youtube.com" },
+    };
     return {
       content: "Opening YouTube.",
-      command: {
-        type: "open_url",
-        url: "https://www.youtube.com",
-        label: "YouTube",
-      },
+      action,
     };
   }
 
   if (command === "open google") {
+    const action: PhoneAction = {
+      type: "OPEN_URL",
+      parameters: { url: "https://www.google.com" },
+    };
     return {
       content: "Opening Google.",
-      command: {
-        type: "open_url",
-        url: "https://www.google.com",
-        label: "Google",
-      },
+      action,
     };
   }
 
   const searchMatch = command.match(/^search the web(?: for (.+))?$/);
   if (searchMatch) {
     const query = searchMatch[1]?.trim();
-    const url = query
-      ? `https://www.google.com/search?q=${encodeURIComponent(query)}`
-      : "https://www.google.com";
 
     return {
       content: query ? `Searching the web for “${query}”.` : "Opening web search.",
-      command: {
-        type: "open_url",
-        url,
-        label: "web search",
+      action: {
+        type: "SEARCH_WEB",
+        parameters: { query: query ?? "" },
+      },
+    };
+  }
+
+  if (command === "open gallery") {
+    return {
+      content: "Requesting access to your gallery.",
+      action: {
+        type: "OPEN_GALLERY",
+        parameters: { source: "device_gallery" },
       },
     };
   }
@@ -59,7 +66,13 @@ export function parseLocalCommand(input: string): ProviderResponse | null {
       dateStyle: "full",
     }).format(new Date());
 
-    return { content: `Today's date is ${date}.` };
+    return {
+      content: `Today's date is ${date}.`,
+      action: {
+        type: "SHOW_DATE",
+        parameters: { locale: "default" },
+      },
+    };
   }
 
   if (
@@ -71,7 +84,13 @@ export function parseLocalCommand(input: string): ProviderResponse | null {
       timeStyle: "short",
     }).format(new Date());
 
-    return { content: `The current time is ${time}.` };
+    return {
+      content: `The current time is ${time}.`,
+      action: {
+        type: "SHOW_TIME",
+        parameters: { locale: "default" },
+      },
+    };
   }
 
   return null;

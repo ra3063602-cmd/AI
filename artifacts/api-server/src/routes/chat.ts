@@ -7,6 +7,7 @@ import { logger } from "../lib/logger";
 import { parseLocalCommand } from "../ai/local-command-provider";
 import { openAiProvider } from "../ai/openai-provider";
 import { AiProviderUnavailableError } from "../ai/provider";
+import { isPhoneAction } from "@workspace/phoneai-actions";
 
 const router: IRouter = Router();
 
@@ -36,7 +37,7 @@ router.post("/chat", async (req, res) => {
           role: "assistant",
           content: localResponse.content,
         },
-        command: localResponse.command ?? null,
+        action: localResponse.action ?? null,
       }),
     );
     return;
@@ -46,13 +47,17 @@ router.post("/chat", async (req, res) => {
     const providerResponse = await openAiProvider.generateResponse(
       parsed.data.messages,
     );
+    const action =
+      providerResponse.action && isPhoneAction(providerResponse.action)
+        ? providerResponse.action
+        : null;
     res.json(
       SendChatMessageResponse.parse({
         message: {
           role: "assistant",
           content: providerResponse.content,
         },
-        command: providerResponse.command ?? null,
+        action,
       }),
     );
   } catch (error) {

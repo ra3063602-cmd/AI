@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { androidBridge } from '@/bridge/android-bridge';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import NotFound from '@/pages/not-found';
+import {
+  isPhoneAction,
+  type PhoneAction,
+} from '@workspace/phoneai-actions';
 import {
   ArrowUpRight,
   AudioLines,
@@ -86,7 +91,7 @@ function Home() {
       const payload = (await response.json().catch(() => null)) as
         | {
             message?: { content?: string };
-            command?: { type?: string; url?: string };
+            action?: unknown;
             error?: string;
           }
         | null;
@@ -112,18 +117,26 @@ function Home() {
         },
       ]);
 
-      if (
-        payload?.command?.type === 'open_url' &&
-        payload.command.url
-      ) {
-        const openedWindow = window.open(
-          payload.command.url,
-          '_blank',
-          'noopener,noreferrer',
-        );
-        if (!openedWindow) {
-          window.location.assign(payload.command.url);
+      const rawAction = payload?.action;
+      if (rawAction !== null && rawAction !== undefined) {
+        if (!isPhoneAction(rawAction)) {
+          throw new Error('The requested action was rejected as invalid.');
         }
+
+        const action: PhoneAction = rawAction;
+        const bridgeResult = await androidBridge.request(action);
+
+        setMessages((current) => [
+          ...current,
+          {
+            id: `bridge-${Date.now()}`,
+            role: 'assistant',
+            text: bridgeResult.displayMessage,
+            time: 'now',
+          },
+        ]);
+
+        runWebPreviewAction(action);
       }
     } catch (error) {
       setErrorMessage(
@@ -348,6 +361,32 @@ function Home() {
       </div>
     </div>
   );
+}
+
+function runWebPreviewAction(action: PhoneAction) {
+  let url: string | null = null;
+
+  switch (action.type) {
+    case 'OPEN_URL':
+      url = action.parameters.url;
+      break;
+    case 'SEARCH_WEB':
+      url = action.parameters.query
+        ? `https://www.google.com/search?q=${encodeURIComponent(action.parameters.query)}`
+        : 'https://www.google.com';
+      break;
+    case 'OPEN_GALLERY':
+    case 'SHOW_DATE':
+    case 'SHOW_TIME':
+      return;
+  }
+
+  if (!url) return;
+
+  const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!openedWindow) {
+    window.location.assign(url);
+  }
 }
 
 type Message = {

@@ -1,17 +1,13 @@
+import type { PhoneAction } from "@workspace/phoneai-actions";
+
 export type ProviderChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
 
-export type ProviderCommand = {
-  type: "open_url";
-  url: string;
-  label: string;
-};
-
 export type ProviderResponse = {
   content: string;
-  command?: ProviderCommand;
+  action?: PhoneAction;
 };
 
 export interface AiProvider {
